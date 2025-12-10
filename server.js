@@ -2,35 +2,36 @@ const express = require('express');
 const cors = require('cors');
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 const redis = require('redis');
+const {config} = require('dotenv');
 
 // Appwrite SDK
 const { Client, Databases, Query } = require('node-appwrite');
-
+config();
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Brevo (Sendinblue) API config
-const apiKey = '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';
-const toEmail = 'support@agoraindia.in';
+const apiKey = process.env.BRAVO_API_KEY;
+const toEmail = process.env.TO_EMAIL;
 
 SibApiV3Sdk.ApiClient.instance.authentications['api-key'].apiKey = apiKey;
 
 // Appwrite config
 const appwriteClient = new Client()
   .setEndpoint('https://fra.cloud.appwrite.io/v1')
-  .setProject('683c060c0022de459ef8')
-  .setKey('standard_74a9ce355e9f0dc20f2bd1a0dca8ccd24d719ed16419aaf1215edae78149aacdfebe4435485a35c949abeeaf9fc33e611894417ecc8bf5783b1b7d32e29886d3c660b8a806b841d08d20f77d043d2741a1710444601885d53b508d32ce88945ed2653ce8569980d866cf94c80c58f7c89d89e46eea241d4d895446f3b6a15888');
+  .setProject(process.env.APPWRITE_PROJECT_ID)
+  .setKey(process.env.APPWRITE_API_KEY);
 
 const databases = new Databases(appwriteClient);
-const DATABASE_ID = '683c063300211620da56';
-const COLLECTION_ID = '686ff2ff00163e7d89bf';
-const PAYMENT_COLLECTION_ID = '686f84900011f8175cd2';
+const DATABASE_ID = process.env.APPWRITE_DATABASE_ID;
+const COLLECTION_ID = process.env.APPWRITE_COLLECTION_ID;
+const PAYMENT_COLLECTION_ID = process.env.APPWRITE_PAYMENTS_COLLECTION_ID;
 
 // Redis client setup
 const redisClient = redis.createClient({
-  url: 'rediss://red-d1n10lemcj7s73bg2dgg:iuDjYftq0A4iJl2omj81fBzUEsqMfq5J@singapore-keyvalue.render.com:6379'
+  url: process.env.REDIS_URL
 });
 redisClient.connect().catch(console.error);
 
@@ -186,6 +187,7 @@ app.post('/check-aadhar', async (req, res) => {
 //     });
 //     res.json({ success: true });
 //   } catch (err) {
+//     console.error('Error storing Aadhar:', err);
 //     if (
 //       err.code === 409 ||
 //       (err.response && err.response.message && err.response.message.includes('already exists'))
@@ -362,7 +364,7 @@ app.post('/send-email', async (req, res) => {
     if (formData.applicationNumber) htmlContent += `<li><b>Application Number:</b> ${formData.applicationNumber}</li>`;
     if (formData.post) htmlContent += `<li><b>Post:</b> ${formData.post}</li>`;
     if (formData.category) htmlContent += `<li><b>Category:</b> ${formData.category}</li>`;
-    if (formData.category !== 'PwBD' && formData.paymentAmount) htmlContent += `<li><b>Payment Amount:</b> ${formData.paymentAmount}/-</li>`;
+    // if (formData.category !== 'PwBD' && formData.paymentAmount) htmlContent += `<li><b>Payment Amount:</b> ${formData.paymentAmount}/-</li>`;
     htmlContent += `</ul>`;
 
     htmlContent += `<h3>Form Data:</h3>`;
@@ -432,7 +434,7 @@ app.post('/send-email', async (req, res) => {
         <p><b>Application Number:</b> ${formData.applicationNumber || ''}</p>
         <p><b>Post:</b> ${formData.post || ''}</p>
         <p><b>Category:</b> ${formData.category || ''}</p>
-        ${formData.category !== 'PwBD' && formData.paymentAmount ? `<p><b>Payment Amount:</b> ${formData.paymentAmount}/-</p>` : ''}
+        
         <p>In the coming days, we will be sending you an admit card and more details about the examination process. Please keep an eye on your email inbox for these updates.</p>
         <p>Once again, thank you for considering LHPCL as your potential employer. We look forward to taking your application to the next stage.</p>
         <br>
@@ -488,6 +490,7 @@ app.post('/check-email', async (req, res) => {
 
     res.json({ exists: false });
   } catch (err) {
+    console.error('Error checking Email:', err);
     res.status(500).json({ error: 'Error checking Email' });
   }
 });
@@ -555,7 +558,7 @@ app.post('/check-phone', async (req, res) => {
 // Endpoint to store Email, Phone, and Aadhar in Appwrite
 
 app.post('/store-data', async (req, res) => {
-  const { email, phone, aadharNumber } = req.body;
+  const { email, phone, aadharNumber,applicationNumber } = req.body;
   if (!email || !phone || !aadharNumber) return res.status(400).json({ error: 'Email, Phone, and Aadhar are required' });
 
   const normalizedEmail = normalizeEmail(email);
@@ -567,10 +570,12 @@ app.post('/store-data', async (req, res) => {
     await databases.createDocument(DATABASE_ID, COLLECTION_ID, 'unique()', {
       email: normalizedEmail,
       phone: phone,
-      aadharNumber: aadharNumber
+      aadharNumber: aadharNumber,
+      applicationNumber: applicationNumber
     });
     res.json({ success: true });
   } catch (err) {
+    console.error('Error storing Data:', err);
     if (
       err.code === 409 ||
       (err.response && err.response.message && err.response.message.includes('already exists'))
@@ -582,6 +587,6 @@ app.post('/store-data', async (req, res) => {
   }
 });
 
-app.listen(5000, () => {
-  console.log('Backend server running on http://localhost:5000');
+app.listen(3000, () => {
+  console.log('Backend server running on http://localhost:3000');
 });
