@@ -573,7 +573,7 @@ app.post('/store-data', async (req, res) => {
       aadharNumber: aadharNumber,
       applicationNumber: applicationNumber
     });
-    res.json({ success: true });
+    res.status(201).json({ success: true });
   } catch (err) {
     console.error('Error storing Data:', err);
     if (
